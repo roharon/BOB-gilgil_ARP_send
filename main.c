@@ -21,11 +21,11 @@
 #define ARP 0x0806
 
 typedef struct{
-    ushort hat; // Hardware address Type - 2byte
-    ushort pat; // Protocol address Type - 2byte
+    u_char hat[2]; // Hardware address Type - 2byte
+    u_char pat[2]; // Protocol address Type - 2byte
     u_char hlen; // Hardware address's length - 1byte
     u_char plen; // protocol address's length - 1byte
-    ushort opcode; // reply & request - 2byte
+    u_char opcode[2]; // reply & request - 2byte
     u_char srcMAC[6]; // source protocol address - 6byte
     u_char srcIP[4]; // Source protocol Address - 4byte
     u_char dstMAC[6]; // destination protocol address - 6byte
@@ -35,7 +35,7 @@ typedef struct{
 typedef struct{
     u_char destination[6];
     u_char source[6];
-    ushort Type;
+    u_char Type[2];
 }ETHER_hdr;
 
 typedef struct{
@@ -56,6 +56,20 @@ int getMyMac(char* myMac){
         }
     }
     return 1;
+}
+
+void setDstMac(u_char* ma, const char* pck){
+
+    for(int i = 0; i< 6; i++){
+        ma[i] = pck[i];
+    }
+}
+
+void setSourceIP(u_char* ip, const char* ip_addr){
+    ip[0] = ip_addr[0];
+    ip[1] = ip_addr[1];
+    ip[2] = ip_addr[2];
+    ip[3] = 1;
 }
 
 void printMyMac(u_char* myMac){
@@ -128,26 +142,55 @@ int main(int argc, char *argv[])
     const uint8_t* packet;
 
     char srcIP[] = {192,168,43,7};
-    char dstIP[] = {192,168,43,115};
+    char dstIP[] = {192,168,43,137};
     char dstMac[] = {0,0,0,0,0,0};
     char broadCast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
     pck.eth = set_ETHER_REQ(broadCast, myMac, ARP);
     pck.arp = set_REQ(myMac, srcIP, dstMac, dstIP);
-    pcap_sendpacket(handle, (const u_char*) &pck, 42);
+
+    u_char data[] ={
+            0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+            0xd0, 0xc6, 0x37, 0xd3, 0x10, 0x0d,
+            0x08, 0x06,
+            0x00, 0x01,
+            0x08, 0x00,
+            0x06, 0x04,
+            0x00, 0x01,
+            0x3c, 0xf0, 0x11, 0x28, 0x2b, 0xbb,
+            0xc0, 0xa8, 0x2b, 0x2b,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xc0, 0xa8, 0x2b, 0x89
+    };
+
     while(true){
+        pcap_sendpacket(handle, (const u_char*) &data, 42);
+    }
+
+    while(false){
+        pcap_sendpacket(handle, (const u_char*) &pck, 42);
+
         struct pcap_pkthdr* header;
-        const uint8_t packet;
+        const uint8_t* packet;
 
         if(pcap_next_ex(handle, &header, &packet) == 0)
             continue;
 
         if(isARP(packet)){
+            printf("@ ");
             if(isMyRep(packet, dstIP)){
+                setDstMac(pck.arp.srcMAC, packet);
                 //destination MAC받아서
+
+
                 //ARP 보냄.
                 //TODO Sender ip = 게이트웨이
-                // 받는 IP 는 destination MAC.
+                //받는 IP 는 destination MAC.
+                //pck.eth = set_ETHER_REQ()
+
+                setSourceIP(pck.arp.srcIP, packet);
+
+                printf("받음");
             }
         }
 
