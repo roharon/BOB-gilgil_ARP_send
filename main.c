@@ -253,7 +253,6 @@ int main(int argc, char *argv[])
     }
     getSendMac(SenderMAC, packet);
     getDstMac(DstMAC, packet);
-    printf("\n%d", memcmp(SenderMAC, myMac, MAC_SIZE));
 
     //TODO sender의 맥주소까지 알아냈으니
     // 패킷수정해서 보내자
@@ -265,18 +264,7 @@ int main(int argc, char *argv[])
     modifyTargetMAC(&data, DstMAC);
     modifyETHDestination(&data, DstMAC);
 
-    printf("\n\n\n\n");
-    for(int i =0; i<MAC_SIZE; i++){
-        printf("%X ", SenderMAC[i]);
-    }
-
-
-
-    printf("\nIP\n");
-    for(int i =0; i<IP_SIZE;i++){
-        printf("%d ", data.arp.dstIP[i]);
-    }
-    printf("\n");
+    printf("\nIP");
 
 /*
  *     modifyETHDestination(&data, SenderMAC);
