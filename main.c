@@ -210,16 +210,18 @@ int main(int argc, char *argv[])
     // dstMAC을 sender_ip의 MAC으로
     packet_type pck;
 
+    char* sender_ip = strtok(argv[2], ".");
+    char* gateway_ip = strtok(argv[3], ".");
+
     const u_char* ucp_DATA;
     pcap_t *stp_NIC;
 
     u_char myMac[6];
     getMyMac(myMac);
-    char* interface = "wlp0s20f3";
+    char* interface = argv[1];
     // char* interface = argv[1];
-    char sender_ip[] = {192,168,43,43};
     //char* sender_ip = argv[2];
-    char gateway_ip[] = {192,168,43,1};
+    //char gateway_ip[] = {192,168,43,1};
     //char* gateway_ip = argv[2];
     char errbuf[PCAP_ERRBUF_SIZE];
 
