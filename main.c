@@ -4,7 +4,6 @@
 #include <string.h>
 #include <pcap/pcap.h>
 
-#include <arpa/inet.h>
 #include <stdint.h>
 #include <linux/if.h>
 #include <sys/ioctl.h>
@@ -14,17 +13,11 @@
 #define true 1
 #define false 0
 
-#define ETHER_NET 1
-#define IP 0x0800
-#define ARP_req 0x0001
-#define ARP_rep 0x0002
-#define ARP 0x0806
 #define MAC_SIZE 6
 #define IP_SIZE 4
 #define OP_SIZE 2
 #define ARP_REQUEST 0x0001
 #define ARP_REPLY 0x0002
-
 
 typedef struct{
     u_char hat[2]; // Hardware address Type - 2byte
@@ -66,11 +59,6 @@ int isRep(const uint8_t* pck){
     return 0;
 }
 
-void getTargetMac(u_char* MAC, const u_char* pck){
-    for(int i = 32;i<32+6;i++){
-        MAC[i-32] = pck[i];
-    }
-}
 void getDstMac(u_char* MAC, const u_char* pck){
     for(int i = 6; i < 12; i++){
         MAC[i-6] = pck[i];
@@ -97,20 +85,6 @@ int getMyMac(char* myMac){
         }
     }
     return 1;
-}
-
-int isSameIP(const u_char* pck){
-    u_char targetMac[6];
-    u_char myMac[6];
-    getTargetMac(targetMac, pck);
-    getMyMac(myMac);
-
-    return !memcmp(myMac, targetMac, MAC_SIZE);
-    // 같으면 1로 반환
-}
-
-void modifyPAT(packet_type* pck, u_char value[]){
-    memcpy(pck->arp.pat, value, sizeof(*value));
 }
 
 void modifyTargetMAC(packet_type* pck, u_char value[]){
@@ -195,10 +169,6 @@ void createPacket(packet_type *pck){
     memcpy(pck->arp.dstMAC, tha, 6);
     u_char tpa[4] = {0xc0, 0xa8, 0x2b, 51};
     memcpy(pck->arp.dstIP, tpa, 4);
-}
-
-void GET_IP(char* ip){
-
 }
 
 
